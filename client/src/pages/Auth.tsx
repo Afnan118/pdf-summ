@@ -29,9 +29,8 @@ export default function Auth() {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        // Optional: you can force the account prompt if needed by using queryParams
         options: {
-          redirectTo: 'http://localhost:5173/workspace',
+          redirectTo: window.location.origin + '/workspace',
           queryParams: {
             prompt: 'select_account'
           }
