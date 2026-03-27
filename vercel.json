@@ -13,10 +13,6 @@
   ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/server/server.js" },
-    { 
-      "source": "/(.*)", 
-      "destination": "/index.html"
-    }
-  ],
-  "cleanUrls": true
+    { "source": "/((?!assets/|public/|favicon.ico|vite.svg).*)", "destination": "/index.html" }
+  ]
 }
