@@ -1,0 +1,17 @@
+﻿node : file:///C:/Users/afnan/OneDrive/Documents/Desktop/Antigravity/ai%20chatbot/server/routes/upload.js:6
+At line:1 char:1
++ node server.js > final_crash.log 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo              : NotSpecified: (fil    e:///C:/User...tes/upl    oad.js:6:String) [], R    emoteException
+    + FullyQualifiedErrorI    d : NativeCommandError
+ 
+const supabase = createClient(
+                 ^
+
+ReferenceError: createClient is not defined
+    at file:///C:/Users/afnan/OneDrive/Documents/Desktop/Antigravity/ai%20chatbot/server/routes/upload.js:6:18
+    at ModuleJob.run (node:internal/modules/esm/module_job:430:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:661:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.14.0
