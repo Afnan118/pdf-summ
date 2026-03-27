@@ -1,11 +1,9 @@
 import { Link } from "react-router-dom";
 
 export default function Dashboard() {
-  const { user } = useUser();
-
   return (
     <div className="py-8">
-      <h1 className="text-3xl font-bold mb-2">Welcome, {user?.firstName || 'User'}!</h1>
+      <h1 className="text-3xl font-bold mb-2">Welcome, User!</h1>
       <p className="text-muted-foreground mb-8">Manage your knowledge base and view recent chats.</p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
