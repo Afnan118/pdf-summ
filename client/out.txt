@@ -1,0 +1,165 @@
+﻿
+> client@0.0.0 build
+> tsc -b && vite build
+
+[36mvite v8.0.2 [32mbuilding client environment for production...[36m[39m
+[2K
+transforming...Γ£ô 470 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.45 kB Γöé gzip:   0.29 kB
+dist/assets/index-Dco1UkYV.css   26.70 kB Γöé gzip:   5.57 kB
+dist/assets/index-DCw6IT6v.js   579.01 kB Γöé gzip: 171.67 kB
+
+node.exe : [33m[plugin 
+builtin:vite-reporter] 
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~
+    + CategoryInfo           
+   : NotSpecified: ([33m[p  
+  lugin builtin:vite-repor   
+ ter] :String) [], Remote    
+Exception
+    + FullyQualifiedErrorId  
+   : NativeCommandError
+ 
+(!) Some chunks are larger 
+than 500 kB after 
+minification. Consider:
+- Using dynamic import() to 
+code-split the application
+- Use build.rolldownOptions.o
+utput.codeSplitting to 
+improve chunking: https://rol
+ldown.rs/reference/OutputOpti
+ons.codeSplitting
+- Adjust chunk size limit 
+for this warning via build.ch
+unkSizeWarningLimit.[39m
+[31mΓ£ù[39m Build failed 
+in 1.86s
+[31merror during build:
+[31mBuild failed with 1 
+error:
+
+Error: [vite]: Rolldown 
+failed to resolve import 
+"lucide-react" from "C:/Users
+/afnan/OneDrive/Documents/Des
+ktop/Antigravity/ai chatbot/c
+lient/src/pages/Workspace.tsx
+".
+This is most likely 
+unintended because it can 
+break your application at 
+runtime.
+If you do want to 
+externalize this module 
+explicitly add it to
+`build.rollupOptions.external
+`
+    at viteLog (file:///C:/Us
+ers/afnan/OneDrive/Documents/
+Desktop/Antigravity/ai%20chat
+bot/client/node_modules/vite/
+dist/node/chunks/node.js:3292
+2:57)
+    at file:///C:/Users/afnan
+/OneDrive/Documents/Desktop/A
+ntigravity/ai%20chatbot/clien
+t/node_modules/vite/dist/node
+/chunks/node.js:32958:71
+    at onwarn (file:///C:/Use
+rs/afnan/OneDrive/Documents/D
+esktop/Antigravity/ai%20chatb
+ot/client/node_modules/@vitej
+s/plugin-react/dist/index.js:
+40:7)
+    at file:///C:/Users/afnan
+/OneDrive/Documents/Desktop/A
+ntigravity/ai%20chatbot/clien
+t/node_modules/vite/dist/node
+/chunks/node.js:32958:28
+    at onRollupLog (file:///C
+:/Users/afnan/OneDrive/Docume
+nts/Desktop/Antigravity/ai%20
+chatbot/client/node_modules/v
+ite/dist/node/chunks/node.js:
+32953:63)
+    at onLog (file:///C:/User
+s/afnan/OneDrive/Documents/De
+sktop/Antigravity/ai%20chatbo
+t/client/node_modules/vite/di
+st/node/chunks/node.js:32723:
+4)
+    at file:///C:/Users/afnan
+/OneDrive/Documents/Desktop/A
+ntigravity/ai%20chatbot/clien
+t/node_modules/rolldown/dist/
+shared/rolldown-build-CL9PyQ2
+E.mjs:49:26
+    at logger (file:///C:/Use
+rs/afnan/OneDrive/Documents/D
+esktop/Antigravity/ai%20chatb
+ot/client/node_modules/rolldo
+wn/dist/shared/rolldown-build
+-CL9PyQ2E.mjs:40:3)
+    at onLog (file:///C:/User
+s/afnan/OneDrive/Documents/De
+sktop/Antigravity/ai%20chatbo
+t/client/node_modules/rolldow
+n/dist/shared/bindingify-inpu
+t-options-DVAZE22h.mjs:1972:3
+2)[31m
+    at aggregateBindingErrors
+IntoJsError (file:///C:/Users
+/afnan/OneDrive/Documents/Des
+ktop/Antigravity/ai%20chatbot
+/client/node_modules/rolldown
+/dist/shared/error-D8cGyrC7.m
+js:48:18)
+    at unwrapBindingResult (f
+ile:///C:/Users/afnan/OneDriv
+e/Documents/Desktop/Antigravi
+ty/ai%20chatbot/client/node_m
+odules/rolldown/dist/shared/e
+rror-D8cGyrC7.mjs:18:128)
+    at #build (file:///C:/Use
+rs/afnan/OneDrive/Documents/D
+esktop/Antigravity/ai%20chatb
+ot/client/node_modules/rolldo
+wn/dist/shared/rolldown-build
+-CL9PyQ2E.mjs:3313:34)
+    at async 
+buildEnvironment (file:///C:/
+Users/afnan/OneDrive/Document
+s/Desktop/Antigravity/ai%20ch
+atbot/client/node_modules/vit
+e/dist/node/chunks/node.js:32
+829:64)
+    at async Object.build (fi
+le:///C:/Users/afnan/OneDrive
+/Documents/Desktop/Antigravit
+y/ai%20chatbot/client/node_mo
+dules/vite/dist/node/chunks/n
+ode.js:33251:19)
+    at async Object.buildApp 
+(file:///C:/Users/afnan/OneDr
+ive/Documents/Desktop/Antigra
+vity/ai%20chatbot/client/node
+_modules/vite/dist/node/chunk
+s/node.js:33248:153)
+    at async CAC.<anonymous> 
+(file:///C:/Users/afnan/OneDr
+ive/Documents/Desktop/Antigra
+vity/ai%20chatbot/client/node
+_modules/vite/dist/node/cli.j
+s:778:3) {
+  errors: [Getter/Setter]
+}[39m
