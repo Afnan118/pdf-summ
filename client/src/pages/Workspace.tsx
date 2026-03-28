@@ -154,7 +154,7 @@ export default function Workspace() {
   const handleDelete = async (id: number) => {
     try {
       const token = await getToken();
-      await fetch(`http://localhost:3004/api/documents/${id}?userId=${userId}`, {
+      await fetch(`/api/documents/${id}?userId=${userId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -183,7 +183,7 @@ export default function Workspace() {
       formData.append("userId", userId);
       const token = await getToken();
       
-      const response = await fetch('http://localhost:3004/api/upload', {
+      const response = await fetch('/api/upload', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -218,7 +218,7 @@ export default function Workspace() {
     setIsSummarizing(true);
     try {
       const token = await getToken();
-      const res = await fetch('http://localhost:3004/api/summarize', {
+      const res = await fetch('/api/summarize', {
         method: "POST",
         headers: {
           'Content-Type': 'application/json',

@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import pdfParse from 'pdf-parse';
-import { generateEmbedding, chunkText } from '../utils/gemini.js';
+import { generateEmbedding, chunkText } from '../utils/ai.js';
 import { createClient } from '@supabase/supabase-js';
 
 const router = express.Router();

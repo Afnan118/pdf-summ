@@ -9,18 +9,6 @@
     "build": "cd client && npm install && npm run build",
     "install:all": "npm install && cd client && npm install && cd ../server && npm install"
   },
-  "dependencies": {
-    "@clerk/clerk-sdk-node": "^4.13.23",
-    "@google/generative-ai": "^0.24.1",
-    "@supabase/supabase-js": "^2.100.0",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
-    "express": "^4.21.2",
-    "multer": "^1.4.5-lts.1",
-    "openai": "^4.86.1",
-    "pdf-parse": "^1.1.1",
-    "pg": "^8.13.3"
-  },
   "devDependencies": {
     "concurrently": "^8.2.2"
   }
