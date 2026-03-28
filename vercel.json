@@ -2,9 +2,9 @@
   "version": 2,
   "builds": [
     {
-      "src": "client/package.json",
+      "src": "package.json",
       "use": "@vercel/static-build",
-      "config": { "distDir": "dist" }
+      "config": { "distDir": "client/dist" }
     },
     {
       "src": "server/server.js",
@@ -12,7 +12,7 @@
     }
   ],
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/server/server.js" },
+    { "source": "/api/(.*)", "destination": "server/server.js" },
     { "source": "/((?!assets/|public/|favicon.ico|vite.svg).*)", "destination": "/index.html" }
   ]
 }

@@ -15,7 +15,7 @@ const port = process.env.PORT || 3004;
 const requiredEnvs = [
   'SUPABASE_URL',
   'SUPABASE_SERVICE_ROLE_KEY',
-  'GEMINI_API_KEY'
+  'OPENAI_API_KEY'
 ];
 
 console.log('--- Server Startup: Environment Check ---');
@@ -72,7 +72,7 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     env: {
       supabase: !!process.env.SUPABASE_URL,
-      gemini: !!process.env.GEMINI_API_KEY
+      openai: !!process.env.OPENAI_API_KEY
     }
   };
   res.json(healthCheck);
