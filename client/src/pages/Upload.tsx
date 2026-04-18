@@ -1,11 +1,13 @@
 import { useState, useCallback } from "react";
+import { supabase } from "../lib/supabase";
 
 export default function Upload() {
   const [isDragging, setIsDragging] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
+  const [statusMessage, setStatusMessage] = useState('');
 
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<'idle'|'uploading'|'success'|'error'>('idle');
+  const [uploadProgress, setUploadProgress] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
 
   const onDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -35,38 +37,68 @@ export default function Upload() {
 
   const handleUpload = async () => {
     if (files.length === 0) return;
-    
+
     setIsUploading(true);
     setUploadProgress('uploading');
+    setStatusMessage('Uploading file to storage...');
 
     try {
-      // For now, we upload sequentially or just the first file as a demo
       const file = files[0];
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      // Send to our Express backend
+
+      // Step 1: Get the current user session
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user?.id;
+      if (!userId) throw new Error('You must be logged in to upload files.');
+
+      // Step 2: Upload file DIRECTLY to Supabase Storage (bypasses Vercel 4.5MB body limit)
+      const fileExt = file.name.split('.').pop() || 'pdf';
+      const storagePath = `${userId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+      const { error: storageError } = await supabase.storage
+        .from('pdfs')
+        .upload(storagePath, file, { contentType: file.type, upsert: false });
+
+      if (storageError) {
+        throw new Error(`Storage upload failed: ${storageError.message}`);
+      }
+
+      setStatusMessage('Extracting text and generating embeddings. This may take a moment...');
+
+      // Step 3: Notify the server with ONLY the lightweight path — no binary payload
       const res = await fetch('/api/upload', {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': userId,
+        },
+        body: JSON.stringify({
+          storagePath,
+          originalname: file.name,
+          mimetype: file.type,
+          userId,
+        }),
       });
 
       if (!res.ok) {
-        throw new Error(await res.text());
+        const errText = await res.text();
+        // Clean up orphaned storage file if server processing fails
+        await supabase.storage.from('pdfs').remove([storagePath]);
+        throw new Error(errText);
       }
-      
+
       const data = await res.json();
       console.log('Upload success:', data);
+      setStatusMessage('');
       setUploadProgress('success');
-      
-      // Optional: Clear files after a delay
+
       setTimeout(() => {
         setFiles([]);
         setUploadProgress('idle');
       }, 3000);
-      
-    } catch (error) {
+
+    } catch (error: any) {
       console.error('Upload failed:', error);
+      setStatusMessage(error.message || 'Upload failed.');
       setUploadProgress('error');
     } finally {
       setIsUploading(false);
@@ -78,18 +110,18 @@ export default function Upload() {
       <h1 className="text-3xl font-bold mb-2">Upload Documents</h1>
       <p className="text-muted-foreground mb-8">Add PDF or TXT files to your knowledge base.</p>
 
-      <div 
+      <div
         className={`border-2 border-dashed rounded-xl p-12 flex flex-col items-center justify-center transition-colors ${isDragging ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'}`}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
       >
         <div className="p-4 bg-muted rounded-full mb-4">
-          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" x2="12" y1="3" y2="15" /></svg>
         </div>
         <p className="text-lg font-medium mb-1">Drag and drop your files here</p>
-        <p className="text-sm text-muted-foreground mb-6">Support for PDF, TXT (Max 10MB)</p>
-        
+        <p className="text-sm text-muted-foreground mb-6">Support for PDF, TXT (up to 50MB)</p>
+
         <label className="cursor-pointer bg-secondary text-secondary-foreground hover:bg-secondary/80 px-6 py-2 rounded-md font-medium transition-colors">
           Browse Files
           <input type="file" className="hidden" multiple accept=".pdf,.txt" onChange={handleFileChange} />
@@ -109,11 +141,12 @@ export default function Upload() {
           </ul>
           <div className="p-4 bg-muted/50 border-t flex items-center justify-between">
             <div>
-              {uploadProgress === 'success' && <span className="text-sm text-green-600 font-medium flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Upload complete!</span>}
-              {uploadProgress === 'error' && <span className="text-sm text-destructive font-medium">Upload failed. Check logs.</span>}
+              {uploadProgress === 'uploading' && statusMessage && <span className="text-sm text-muted-foreground italic">{statusMessage}</span>}
+              {uploadProgress === 'success' && <span className="text-sm text-green-600 font-medium flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg> Upload complete!</span>}
+              {uploadProgress === 'error' && <span className="text-sm text-destructive font-medium">{statusMessage || 'Upload failed.'}</span>}
             </div>
-            <button 
-              onClick={handleUpload} 
+            <button
+              onClick={handleUpload}
               disabled={isUploading}
               className="bg-primary text-primary-foreground px-6 py-2 rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
             >

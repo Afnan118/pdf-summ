@@ -11,36 +11,96 @@ export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleManualAuth = (e: React.FormEvent) => {
+  const handleManualAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // Simulate manual authentication delay
-    setTimeout(() => {
-      setIsLoading(false);
-      localStorage.setItem('isAuthenticated', 'true');
-      localStorage.setItem('userEmail', email);
-      localStorage.setItem('userName', isLogin ? email.split('@')[0] : name);
+    try {
+      if (isLogin) {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) {
+          if (error.message?.toLowerCase().includes('invalid login credentials')) {
+            throw new Error(
+              'Invalid credentials. Check your password, or if you signed up with Google, use the Google button. You can also use "Forgot your password?"'
+            );
+          }
+          throw error;
+        }
+      } else {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: name,
+            },
+          },
+        });
+        if (error) throw error;
+
+        // If email confirmation is off, data.session will exist
+        if (data?.session) {
+          navigate('/workspace');
+          return;
+        } else {
+          alert('✅ Check your email for the confirmation link!');
+          return; // Don't navigate yet — user must confirm email first
+        }
+      }
+
       navigate('/workspace');
-    }, 1200);
+    } catch (err: any) {
+      console.error('Auth Error:', err);
+      alert(err.message || 'Authentication failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!email) {
+      alert("Please enter your email address first before clicking 'Forgot your password?'.");
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + '/workspace',
+      });
+      if (error) throw error;
+      alert("✅ Password reset link sent! Please check your email to reset your password and login.");
+    } catch (err: any) {
+      console.error("Reset password error:", err);
+      alert("Failed to send reset link: " + err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleGoogleAuth = async () => {
     setIsLoading(true);
     try {
+      // Always redirect back to THIS origin after Google OAuth
+      // (localhost:5173 in dev, Vercel URL in production)
+      const redirectUrl = `${window.location.origin}/workspace`;
+      console.log('Google OAuth redirectTo:', redirectUrl);
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin + '/workspace',
+          redirectTo: redirectUrl,
           queryParams: {
-            prompt: 'select_account'
-          }
-        }
+            prompt: 'select_account',
+          },
+        },
       });
       if (error) throw error;
-    } catch (err) {
-      console.error("Google Auth Error:", err);
+    } catch (err: any) {
+      console.error('Google Auth Error:', err);
       setIsLoading(false);
-      alert("Failed to initialize Google Sign In");
+      alert('Failed to initialize Google Sign In: ' + err.message);
     }
   };
 
@@ -49,7 +109,7 @@ export default function Auth() {
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center text-blue-600 mb-6">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-12 h-12">
-            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
           </svg>
         </div>
         <h2 className="text-center text-3xl font-extrabold text-slate-900">
@@ -63,7 +123,7 @@ export default function Auth() {
         </p>
       </div>
 
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="mt-8 sm:mx-auto sm:w-full sm:max-w-md"
@@ -146,9 +206,13 @@ export default function Auth() {
                 </div>
 
                 <div className="text-sm">
-                  <a href="#" className="font-medium text-blue-600 hover:text-blue-500 transition-colors">
+                  <button
+                    type="button"
+                    onClick={handleResetPassword}
+                    className="font-medium text-blue-600 hover:text-blue-500 transition-colors bg-transparent border-none p-0 cursor-pointer"
+                  >
                     Forgot your password?
-                  </a>
+                  </button>
                 </div>
               </div>
             )}
@@ -171,7 +235,7 @@ export default function Auth() {
           <div className="mt-8">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-               <div className="w-full border-t border-slate-200" />
+                <div className="w-full border-t border-slate-200" />
               </div>
               <div className="relative flex justify-center text-sm">
                 <span className="px-2 bg-white text-slate-500">Or continue with</span>

@@ -1,13 +1,8 @@
 import express from 'express';
-import { createClient } from '@supabase/supabase-js';
-import openai, { aiModel } from '../utils/ai.js';
+import { supabase } from '../utils/supabase.js';
+import { getChatModel } from '../utils/gemini.js';
 
 const router = express.Router();
-
-const supabase = createClient(
-  process.env.SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-);
 
 router.post('/', async (req, res) => {
   try {
@@ -58,14 +53,44 @@ router.post('/', async (req, res) => {
     ${doc.content.substring(0, 50000)}
     `;
 
-    console.log(`[Summarize] Calling OpenAI (${aiModel})...`);
-    const completion = await openai.chat.completions.create({
-      model: aiModel,
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" }
-    });
+    console.log(`[Summarize] Calling Gemini API...`);
+    let model = getChatModel();
 
-    const summaryJSON = JSON.parse(completion.choices[0].message.content);
+    let result;
+    let attempt = 0;
+    while (attempt < 4) {
+      try {
+        result = await model.generateContent({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseMimeType: "application/json"
+          }
+        });
+        break; // break if success
+      } catch (err) {
+        attempt++;
+        if (err.message && (err.message.includes('503') || err.message.includes('429'))) {
+          if (attempt >= 4) throw err;
+
+          let waitSeconds = attempt * 3;
+          // Strategy: Switch model on 2nd and 3rd attempt to bypass specific model overloads
+          if (attempt === 2) {
+            console.log(`[Summarize] 🔄 Falling back to gemini-1.5-pro model due to persistent overload...`);
+            model = getChatModel("", "gemini-1.5-pro");
+          } else if (attempt === 3) {
+            console.log(`[Summarize] 🔄 Falling back to gemini-1.5-flash model due to persistent overload...`);
+            model = getChatModel("", "gemini-1.5-flash");
+          }
+
+          console.log(`[Summarize] Gemini 503/429 Error. Retrying in ${waitSeconds} seconds...`);
+          await new Promise(r => setTimeout(r, waitSeconds * 1000));
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    const summaryJSON = JSON.parse(result.response.text());
 
     // Persist to database
     await supabase.from('documents').update({
@@ -79,9 +104,14 @@ router.post('/', async (req, res) => {
 
   } catch (error) {
     console.error('[Summarize] Error:', error);
+    let fallbackErrorMsg = "We encountered an error while summarizing this document.";
+    if (error.message && error.message.includes('503')) {
+      fallbackErrorMsg = "Google's Gemini Free Tier is currently experiencing extreme high demand. The bots are overloaded right now. Please try again in a few minutes.";
+    }
+
     return res.json({
       short_summary: "Summarization failed.",
-      detailed_summary: "We encountered an error while summarizing this document. Please check your OpenAI API key and balance.",
+      detailed_summary: fallbackErrorMsg,
       key_points: ["Error: " + error.message]
     });
   }

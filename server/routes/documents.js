@@ -1,12 +1,7 @@
 import express from 'express';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../utils/supabase.js';
 
 const router = express.Router();
-
-const supabase = createClient(
-  process.env.SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-);
 
 
 // GET all documents for user
@@ -22,8 +17,9 @@ router.get('/', async (req, res) => {
     if (error) throw error;
     res.json(documents);
   } catch (err) {
+    if (err.cause) console.error('Error fetching documents (Cause):', err.cause.message || err.cause);
     console.error('Error fetching documents:', err.message);
-    res.status(500).json({ error: 'Failed to fetch documents' });
+    res.status(500).json({ error: `Failed to fetch documents: ${err.message}${err.cause ? ' (' + (err.cause.message || err.cause) + ')' : ''}` });
   }
 });
 
@@ -49,8 +45,9 @@ router.delete('/:id', async (req, res) => {
     
     res.json({ success: true, message: 'Document deleted' });
   } catch (err) {
+    if (err.cause) console.error('Error deleting document (Cause):', err.cause.message || err.cause);
     console.error('Error deleting document:', err.message);
-    res.status(500).json({ error: 'Failed to delete document' });
+    res.status(500).json({ error: `Failed to delete document: ${err.message}${err.cause ? ' (' + (err.cause.message || err.cause) + ')' : ''}` });
   }
 });
 

@@ -1,6 +1,7 @@
 {
   "name": "ai-customer-support-agent",
   "version": "1.0.0",
+  "type": "module",
   "description": "RAG AI Customer Support Agent with React, Vite, Express, PostgreSQL",
   "scripts": {
     "dev:client": "cd client && npm run dev",
@@ -11,5 +12,13 @@
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@supabase/supabase-js": "^2.103.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "pdf-parse": "^2.4.5"
   }
 }

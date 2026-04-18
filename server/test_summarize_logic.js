@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 async function testSummarize() {
   const content = "This is a test document content about AI and PDF summarization. It should be summarized into JSON.";
@@ -26,25 +26,38 @@ Document Content:
 ${content}
 `;
 
-  try {
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: "application/json" }
-    });
+  let attempt = 0;
+  const maxAttempts = 5;
 
-    let responseText = result.response.text() || '{}';
-    console.log("Raw Response:", responseText);
-    
-    // Clean markdown code blocks if present
-    responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-    const summaryJSON = JSON.parse(responseText);
-    console.log("✅ Success:", summaryJSON);
-  } catch (error) {
-    console.error("❌ Failed:", error.message);
-    if (error.response) {
-      console.error("Response data:", error.response);
+  while (attempt < maxAttempts) {
+    try {
+      console.log(`[Test] Attempt ${attempt + 1}/${maxAttempts}...`);
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: "application/json" }
+      });
+
+      let responseText = result.response.text() || '{}';
+      console.log("Raw Response received.");
+      
+      responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+      const summaryJSON = JSON.parse(responseText);
+      console.log("✅ Success:", summaryJSON);
+      return;
+    } catch (error) {
+      attempt++;
+      console.error(`❌ Attempt ${attempt} Failed:`, error.message);
+      
+      if (error.message && (error.message.includes('429') || error.message.includes('503'))) {
+        const waitTime = Math.pow(2, attempt) * 2000;
+        console.log(`[Quota/Overload] Waiting ${waitTime / 1000}s before retry...`);
+        await new Promise(r => setTimeout(r, waitTime));
+      } else {
+        throw error;
+      }
     }
   }
+  console.error("❌ All attempts failed.");
 }
 
 testSummarize();

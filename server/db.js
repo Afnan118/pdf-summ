@@ -1,7 +1,12 @@
 import pg from 'pg';
 import dotenv from 'dotenv';
 
-dotenv.config();
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
+dotenv.config(); // Fallback to current dir .env
 
 const { Pool } = pg;
 
@@ -9,10 +14,10 @@ const { Pool } = pg;
 // Switching to port 6543 for Supabase Connection Pooler (more stable than 5432)
 const pool = new Pool({
   user: 'postgres',
-  host: 'db.rqumsfeezsttbqatidyz.supabase.co',
+  host: process.env.SUPABASE_DB_HOST || 'localhost',
   database: 'postgres',
   password: process.env.DATABASE_PASSWORD,
-  port: 6543,
+  port: parseInt(process.env.SUPABASE_DB_PORT || '6543'),
   ssl: { rejectUnauthorized: false } // Required for Supabase
 });
 

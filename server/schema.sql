@@ -11,6 +11,10 @@ CREATE TABLE IF NOT EXISTS documents (
   filename TEXT NOT NULL,
   file_url TEXT,
   content TEXT, -- Stores the full extracted text for reference
+  short_summary TEXT,
+  detailed_summary TEXT,
+  key_points TEXT,
+  metadata JSONB DEFAULT '{}',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

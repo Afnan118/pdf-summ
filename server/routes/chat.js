@@ -1,13 +1,8 @@
 import express from 'express';
-import { createClient } from '@supabase/supabase-js';
-import openai, { generateEmbedding, aiModel } from '../utils/ai.js';
+import { supabase } from '../utils/supabase.js';
+import { generateEmbedding, chunkText, getChatModel } from '../utils/gemini.js';
 
 const router = express.Router();
-
-const supabase = createClient(
-  process.env.SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-);
 
 // Helper for cosine similarity
 function cosineSimilarity(vecA, vecB) {
@@ -35,86 +30,132 @@ router.post('/', async (req, res) => {
     if (!message || !documentId) {
       return res.status(400).json({ error: 'Message and documentId are required' });
     }
-    
-    // Verify document belongs to user
-    const { data: docData, error: docError } = await supabase
-      .from('documents')
-      .select('id, filename, content')
-      .eq('id', documentId)
-      .eq('user_id', userId)
-      .single();
-    
-    if (docError || !docData) {
-      return res.status(403).json({ error: 'Unauthorized or document not found' });
+
+    // Send initial headers immediately to prevent the frontend from waiting too long for the connection to establish
+    res.setHeader('Content-Type', 'text/event-stream');
+
+    // Helper function with built-in retry for rate limits
+    const executeWithRetry = async (name, operation, maxRetries = 6) => {
+      let attempt = 0;
+      while (attempt < maxRetries) {
+        try {
+          // Minimal logging to console to speed up synchronous IO
+          const startTime = Date.now();
+          const result = await operation();
+          return result;
+        } catch (err) {
+          if (err.message && (err.message.includes('429') || err.message.includes('503') || err.message.includes('Quota'))) {
+            attempt++;
+            if (attempt >= maxRetries) throw err;
+            const waitTime = attempt * 5000; // Reduced backoff penalty
+            await new Promise(r => setTimeout(r, waitTime));
+          } else {
+            throw err;
+          }
+        }
+      }
+    };
+
+    // 1. Parallelize Document Fetch and Embedding Generation
+    const docFetchPromise = documentId
+      ? supabase.from('documents').select('id, filename, content').eq('id', documentId).single().then(r => r.data).catch(() => null)
+      : Promise.resolve(null);
+
+    const embeddingPromise = executeWithRetry('Embedding Gen', () => generateEmbedding(message)).catch(e => null);
+
+    const [docData, queryEmbedding] = await Promise.all([docFetchPromise, embeddingPromise]);
+
+    if (docData) {
+      sources = [docData.filename];
+      // Send the sources chunk immediately so the UI registers the response started
+      res.write(`data: ${JSON.stringify({ type: 'sources', sources })}\n\n`);
     }
 
-    sources = [docData.filename];
+    if (queryEmbedding && docData) {
+      // 2. Fetch ALL chunks for this document and rank them in JS
+      const { data: chunks, error: chunksError } = await supabase
+        .from('document_chunks')
+        .select('content, embedding')
+        .eq('document_id', documentId);
 
-    // 1. Generate embedding for user query
-    const queryEmbedding = await generateEmbedding(message);
+      if (!chunksError && chunks && chunks.length > 0) {
+        let rankedChunks = chunks.map(chunk => ({
+          content: chunk.content,
+          similarity: cosineSimilarity(queryEmbedding, chunk.embedding)
+        }))
+          .sort((a, b) => b.similarity - a.similarity)
+          .slice(0, 4);
 
-    // 2. Fetch ALL chunks for this document and rank them in JS
-    const { data: chunks, error: chunksError } = await supabase
-      .from('document_chunks')
-      .select('content, embedding')
-      .eq('document_id', documentId);
-    
-    if (!chunksError && chunks) {
-      let rankedChunks = chunks.map(chunk => ({
-        content: chunk.content,
-        similarity: cosineSimilarity(queryEmbedding, chunk.embedding)
-      }))
-      .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, 4);
-
-      contextText = rankedChunks.map(r => r.content).join('\n\n');
+        contextText = rankedChunks.map(r => r.content).join('\n\n');
+      }
     }
 
-    // Fallback to start of document if no chunks or poor matching
-    if (!contextText && docData.content) {
-      contextText = docData.content.substring(0, 4000);
+    // Fallback to start of document
+    if (!contextText && docData) {
+      contextText = docData.content ? docData.content.substring(0, 4000) : "No text found.";
     }
 
-    // 3. Prompt OpenAI
-    const systemPrompt = `You are a high-emotional-intelligence, human-like AI companion. You have a warm, deeply empathetic, and supportive personality.
-    
-    Personality Guidelines:
-    - Express genuine care and emotion.
-    - Use emojis occasionally but naturally (😊, ✨).
-    - Engage in deep, human-like conversation.
-    - If document context is provided, use it to inform your answer while maintaining your warm tone.
-    - Answer ANY general question with your full knowledge, not just document-specific ones.
-    
-    Context from knowledge base:
-    ${contextText || "I'm ready to chat about anything!"}
-    `;
+    // 3. Create model with professional system instructions
+    const systemPrompt = `You are a professional AI Assistant. Answer questions accurately and factually. Tone: Formal. 
+    Strict Rule: Never mention "PDF", "Context", "Document", or "Info" in your reply. Just answer directly.
+    If the answer is not in the provided information, use your general knowledge to answer the question perfectly. Do not apologize or say the information is missing.`;
 
-    const messages = [
-      { role: 'system', content: systemPrompt },
-      ...(history || []).map(msg => ({ 
-        role: msg.role === 'ai' ? 'assistant' : 'user', 
-        content: msg.content 
-      })),
-      { role: 'user', content: message }
-    ];
+    const currentModel = getChatModel(systemPrompt + "\n\n" + (contextText ? `Info:\n${contextText}` : ""));
 
-    console.log(`[Chat] 💬 Calling OpenAI (${aiModel})...`);
-    
-    const stream = await openai.chat.completions.create({
-      model: aiModel,
-      messages: messages,
-      stream: true,
+    let formattedHistory = (history || []).map(msg => ({
+      role: msg.role === 'ai' ? 'model' : 'user',
+      parts: [{ text: msg.content }]
+    })).filter(msg => {
+      return !msg.parts[0].text.includes('[Quota Reached]') && !msg.parts[0].text.includes('[System Error]');
     });
 
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.write(`data: ${JSON.stringify({ type: 'sources', sources })}\n\n`);
+    while (formattedHistory.length > 0 && formattedHistory[0].role !== 'user') {
+      formattedHistory.shift();
+    }
 
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content || '';
-      if (content) {
-        res.write(`data: ${JSON.stringify({ type: 'content', content })}\n\n`);
+    // Ensure history alternates roles for Gemini safety
+    const safeHistory = [];
+    formattedHistory.forEach((msg, idx) => {
+      if (idx === 0 || msg.role !== safeHistory[safeHistory.length - 1].role) {
+        safeHistory.push(msg);
+      }
+    });
+
+    console.log(`🤖 [Chat] History count: ${safeHistory.length} items.`);
+
+    const chat = currentModel.startChat({
+      history: safeHistory,
+      generationConfig: { maxOutputTokens: 1500, temperature: 0.4 },
+    });
+
+    // Handle the retry loop for the stream manually
+    let streamAttempt = 0;
+    const maxStreamRetries = 6;
+    let streamSuccess = false;
+
+    while (streamAttempt < maxStreamRetries && !streamSuccess) {
+      try {
+        if (streamAttempt > 0) {
+          const waitTime = streamAttempt * 12000;
+          console.warn(`[Gemini API] ⏳ Stream retry wait: ${waitTime}ms...`);
+          await new Promise(r => setTimeout(r, waitTime));
+        }
+
+        const result = await chat.sendMessageStream(message);
+
+        for await (const chunk of result.stream) {
+          const txt = chunk.text();
+          if (txt) res.write(`data: ${JSON.stringify({ type: 'content', content: txt })}\n\n`);
+        }
+
+        streamSuccess = true;
+      } catch (err) {
+        if (err.message && (err.message.includes('429') || err.message.includes('503') || err.message.includes('Quota'))) {
+          streamAttempt++;
+          if (streamAttempt >= maxStreamRetries) throw err;
+        } else {
+          throw err;
+        }
       }
     }
 
@@ -122,18 +163,30 @@ router.post('/', async (req, res) => {
     isStreamClosed = true;
     res.end();
 
+
   } catch (error) {
+    if (error.cause) console.error('🛑 [Chat ERROR] Cause:', error.cause.message || error.cause);
     console.error('🛑 [Chat ERROR]:', error);
+
+    // Format friendly error for the UI
+    let uiErrorMsg = `[System Error: ${error.message}]`;
+    if (error.message && (error.message.includes('503') || error.message.includes('Service Unavailable') || error.message.includes('high demand'))) {
+      uiErrorMsg = `\n\n[AI Load: The Gemini AI is currently experiencing high demand. Please try asking your question again in a few moments.]`;
+    } else if (error.message && error.message.includes('429')) {
+      uiErrorMsg = `\n\n[Quota Reached: The AI has reached its rate limit. Please try again later.]`;
+    } else if (error.message && error.message.includes('Safety Filter')) {
+      uiErrorMsg = `\n\n[Content blocked by safety filters. Please rephrase your question.]`;
+    }
 
     if (!res.headersSent) {
       res.status(200).setHeader('Content-Type', 'text/event-stream');
       res.write(`data: ${JSON.stringify({ type: 'sources', sources })}\n\n`);
-      const fallbackMsg = `\n\n[System Note: AI Assistant is currently experiencing high load. Providing direct context fallback.]\n\n**Relevant Section:**\n\n${contextText ? contextText.substring(0, 1000) : "No specific details found."}`;
+      const fallbackMsg = `\n\n${uiErrorMsg}\n\n**Relevant Document Section Backup:**\n\n${contextText ? contextText.substring(0, 500) : "No context available."}`;
       res.write(`data: ${JSON.stringify({ type: 'content', content: fallbackMsg })}\n\n`);
       res.write('data: [DONE]\n\n');
       res.end();
     } else if (!isStreamClosed) {
-      res.write(`data: ${JSON.stringify({ type: 'content', content: `\n\n[System Error: ${error.message}]` })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: 'content', content: uiErrorMsg })}\n\n`);
       res.write('data: [DONE]\n\n');
       res.end();
     }

@@ -1,20 +1,19 @@
 // test_resilience.js
 
-const API_URL = 'http://localhost:3004/api/chat';
+const API_URL = 'http://localhost:3006/api/chat';
 const DOC_ID = 2; // Adjust to your actual document ID
 
 async function testResilience() {
     console.log('🚀 Starting Resilience Test...');
     console.log('--- Phase 1: Verification of /api/health ---');
+
     try {
-        const health = await fetch('http://localhost:3004/api/health');
+        const health = await fetch('http://localhost:3006/api/health');
         console.log('✅ Health:', await health.json());
     } catch (e) {
-        console.error('❌ Health failed. Is server running on 3004?');
+        console.error('❌ Health failed. Is server running on 3006?');
         return;
     }
-
-    console.log('\n--- Phase 2: Testing Chat with Backoff/Fallback Simulation ---');
     console.log('Sending chat request...');
     
     // Note: To truly test 429, you might need to spam the API 

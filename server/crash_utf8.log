@@ -1,0 +1,68 @@
+﻿node : file:///C:/Users
+/afnan/OneDrive/Documen
+ts/Desktop/Antigravity/
+ai%20chatbot/server/nod
+e_modules/openai/index.
+mjs:48
+At line:1 char:1
++ node server.js > 
+crash.log 2>&1
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (file:///C:/Us   
+ er...ai/index.mjs:    
+48:String) [], Rem    
+oteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+            throw new E
+rrors.OpenAIError("The 
+OPENAI_API_KEY 
+environment variable 
+is missing or empty; 
+either provide it, or 
+instantiate the OpenAI 
+client with an apiKey 
+option, like new 
+OpenAI({ apiKey: 'My 
+API Key' }).");
+                  ^
+
+OpenAIError: The 
+OPENAI_API_KEY 
+environment variable 
+is missing or empty; 
+either provide it, or 
+instantiate the OpenAI 
+client with an apiKey 
+option, like new 
+OpenAI({ apiKey: 'My 
+API Key' }).
+    at new OpenAI (file
+:///C:/Users/afnan/OneD
+rive/Documents/Desktop/
+Antigravity/ai%20chatbo
+t/server/node_modules/o
+penai/index.mjs:48:19)
+    at file:///C:/Users
+/afnan/OneDrive/Documen
+ts/Desktop/Antigravity/
+ai%20chatbot/server/uti
+ls/openai.js:6:23
+    at ModuleJob.run (n
+ode:internal/modules/es
+m/module_job:430:25)
+    at async onImport.t
+racePromise.__proto__ (
+node:internal/modules/e
+sm/loader:661:26)
+    at async asyncRunEn
+tryPointWithESMLoader (
+node:internal/modules/r
+un_main:101:5)
+
+Node.js v24.14.0

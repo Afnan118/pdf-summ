@@ -1,14 +1,6 @@
-import pg from 'pg';
-const { Pool } = pg;
-
-const pool = new Pool({
-  user: 'postgres',
-  host: 'db.rqumsfeezsttbqatidyz.supabase.co',
-  database: 'postgres',
-  password: '3186@Yenepoya',
-  port: 6543,
-  ssl: { rejectUnauthorized: false }
-});
+import pool from './db.js';
+import dotenv from 'dotenv';
+dotenv.config();
 
 console.log('Testing connection...');
 try {

@@ -176,6 +176,11 @@ export default function Chat({ documentId, userId, tokenGetter }: ChatProps) {
               try {
                 const parsed = JSON.parse(dataStr);
                 
+                // CRITICAL FIX: Mutate outside of React state updater to prevent repeating text.
+                if (parsed.type === 'content') {
+                  fullContent += parsed.content;
+                }
+                
                 setSessions(prev => prev.map(s => {
                   if (s.id === activeSessionId) {
                     return {
@@ -184,7 +189,6 @@ export default function Chat({ documentId, userId, tokenGetter }: ChatProps) {
                         if (msg.id === aiMessageId) {
                           if (parsed.type === 'sources') return { ...msg, sources: parsed.sources };
                           if (parsed.type === 'content') {
-                            fullContent += parsed.content;
                             return { ...msg, content: fullContent };
                           }
                         }

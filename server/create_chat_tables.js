@@ -5,10 +5,10 @@ const { Pool } = pg;
 
 const pool = new Pool({
   user: 'postgres',
-  host: 'db.rqumsfeezsttbqatidyz.supabase.co',
+  host: process.env.SUPABASE_DB_HOST || 'localhost',
   database: 'postgres',
   password: process.env.DATABASE_PASSWORD,
-  port: 5432, // Direct connection for DDL
+  port: parseInt(process.env.SUPABASE_DB_PORT_DIRECT || '5432'), // Direct connection preferred for DDL
   ssl: { rejectUnauthorized: false }
 });
 

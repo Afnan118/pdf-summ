@@ -15,12 +15,9 @@ export default function Workspace() {
 
   useEffect(() => {
     let timeoutId: number;
-    const isLocalAuth = localStorage.getItem('isAuthenticated') === 'true';
     const hasHashString = window.location.hash.includes('access_token=');
     
-    console.log("Workspace Auth Check - LocalAuth:", isLocalAuth, "HasHash:", hasHashString);
-    
-    // Safety timer: If Supabase takes > 5s, assume not authenticated for now to unstick UI
+    // Safety timer only for real Supabase auth
     const safetyTimer = setTimeout(() => {
       if (isAuthenticated === null) {
         console.warn("Auth check timed out, defaulting to non-authenticated state.");
@@ -55,7 +52,7 @@ export default function Workspace() {
         return; 
       }
       
-      if (session || isLocalAuth) {
+      if (session) {
         setIsAuthenticated(true);
       } else {
         setIsAuthenticated(false);
@@ -69,7 +66,7 @@ export default function Workspace() {
       if (session) {
         setIsAuthenticated(true);
         window.history.replaceState(null, '', window.location.pathname);
-      } else if (!hasHashString && !isLocalAuth) {
+      } else if (!hasHashString) {
         setIsAuthenticated(false);
       }
     });
@@ -106,8 +103,12 @@ export default function Workspace() {
   }, []);
 
   const getToken = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    return session?.access_token || '';
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      return session?.access_token || '';
+    } catch (e) {
+      return '';
+    }
   };
 
   const fetchDocuments = useCallback(async () => {
@@ -178,24 +179,53 @@ export default function Workspace() {
     setIsUploading(true);
     setShowUploadModal(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("userId", userId);
+      // Convert file to base64
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve, reject) => {
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(',')[1]); // get just the base64 part
+        };
+        reader.onerror = error => reject(error);
+        reader.readAsDataURL(file);
+      });
+      const fileBase64 = await base64Promise;
+
+      const payload = {
+        fileBase64,
+        originalname: file.name,
+        mimetype: file.type,
+        userId
+      };
+
       const token = await getToken();
       
       const response = await fetch('/api/upload', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'X-User-Id': userId
+          'X-User-Id': userId,
+          'Content-Type': 'application/json'
         },
-        body: formData,
+        body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
+      let data;
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        try {
+          data = await response.json();
+        } catch (e) {
+          console.error("Failed to parse JSON response:", e);
+        }
+      } else {
+        const text = await response.text();
+        console.warn("Server returned non-JSON response:", text);
+        data = { error: text || `Server error: ${response.status}` };
+      }
 
       if (!response.ok) {
-        throw new Error(data.error || 'Upload failed');
+        throw new Error(data?.error || `Upload failed with status ${response.status}`);
       }
 
       console.log('Upload success:', data);
