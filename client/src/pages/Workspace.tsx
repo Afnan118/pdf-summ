@@ -16,7 +16,7 @@ export default function Workspace() {
   useEffect(() => {
     let timeoutId: number;
     const hasHashString = window.location.hash.includes('access_token=');
-    
+
     // Safety timer only for real Supabase auth
     const safetyTimer = setTimeout(() => {
       if (isAuthenticated === null) {
@@ -28,7 +28,7 @@ export default function Workspace() {
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       clearTimeout(safetyTimer);
       console.log("Supabase Session Result - Session:", !!session, "Error:", error?.message);
-      
+
       const hasErrorHash = window.location.hash.includes('error=');
       if (hasErrorHash) {
         const params = new URLSearchParams(window.location.hash.substring(1));
@@ -36,12 +36,12 @@ export default function Workspace() {
         setAuthError("Google Login Failed: " + errMsg.replace(/\+/g, ' '));
         return;
       }
-      
+
       if (error) {
         setAuthError(error.message);
         return;
       }
-      
+
       if (!session && hasHashString) {
         // Wait max 10 seconds for the event to fire
         timeoutId = window.setTimeout(() => {
@@ -49,9 +49,9 @@ export default function Workspace() {
             setAuthError("Auth Timeout: Failed to parse Google Login. This usually means your Supabase VITE_SUPABASE_ANON_KEY is missing or invalid in .env.local.");
           }
         }, 10000);
-        return; 
+        return;
       }
-      
+
       if (session) {
         setIsAuthenticated(true);
       } else {
@@ -84,7 +84,7 @@ export default function Workspace() {
   const [isSidebarLoading, setSidebarLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  
+
   const [summary, setSummary] = useState<any>(null);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -94,11 +94,11 @@ export default function Workspace() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user?.id) setUserId(session.user.id);
     });
-    
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user?.id) setUserId(session.user.id);
     });
-    
+
     return () => subscription.unsubscribe();
   }, []);
 
@@ -179,27 +179,28 @@ export default function Workspace() {
     setIsUploading(true);
     setShowUploadModal(true);
     try {
-      // Convert file to base64
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve, reject) => {
-        reader.onload = () => {
-          const result = reader.result as string;
-          resolve(result.split(',')[1]); // get just the base64 part
-        };
-        reader.onerror = error => reject(error);
-        reader.readAsDataURL(file);
-      });
-      const fileBase64 = await base64Promise;
+      // Step 1: Upload directly to Supabase Storage
+      const fileExt = file.name.split('.').pop() || 'pdf';
+      const storagePath = `${userId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
 
+      const { error: storageError } = await supabase.storage
+        .from('pdfs')
+        .upload(storagePath, file, { contentType: file.type, upsert: false });
+
+      if (storageError) {
+        throw new Error(`Storage upload failed: ${storageError.message}`);
+      }
+
+      // Step 2: Notify server with lightweight path
       const payload = {
-        fileBase64,
+        storagePath,
         originalname: file.name,
         mimetype: file.type,
         userId
       };
 
       const token = await getToken();
-      
+
       const response = await fetch('/api/upload', {
         method: 'POST',
         headers: {
@@ -221,6 +222,9 @@ export default function Workspace() {
       } else {
         const text = await response.text();
         console.warn("Server returned non-JSON response:", text);
+
+        // Clean up storage file if server failed
+        await supabase.storage.from('pdfs').remove([storagePath]);
         data = { error: text || `Server error: ${response.status}` };
       }
 
@@ -233,8 +237,8 @@ export default function Workspace() {
       setShowUploadModal(false);
     } catch (error: any) {
       console.error('Error uploading file:', error);
-      const errorMessage = error.message === 'Failed to fetch' 
-        ? 'Network Error: Cannot connect to the backend server. Please ensure the server is running on port 3004.' 
+      const errorMessage = error.message === 'Failed to fetch'
+        ? 'Network Error: Cannot connect to the backend server. Please ensure the server is running on port 3004.'
         : (error.message || 'Upload failed. Please check your connection and try again.');
       alert(errorMessage);
     } finally {
@@ -254,7 +258,7 @@ export default function Workspace() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           documentId: activeDocId,
           userId: userId
         })
@@ -292,7 +296,7 @@ export default function Workspace() {
 
   return (
     <div className="flex h-screen w-full bg-slate-100 overflow-hidden font-sans">
-      <Sidebar 
+      <Sidebar
         documents={documents}
         activeDocumentId={activeDocId}
         onSelectDocument={setActiveDocId}
@@ -306,10 +310,10 @@ export default function Workspace() {
           <>
             {/* Left Sidebar: Document Insights */}
             <div className="w-full md:w-[400px] lg:w-[450px] flex flex-col border-r bg-white overflow-y-auto p-6 scrollbar-thin">
-              <SummaryCard 
-                summary={summary} 
-                isLoading={isSummarizing} 
-                onSummarize={handleSummarize} 
+              <SummaryCard
+                summary={summary}
+                isLoading={isSummarizing}
+                onSummarize={handleSummarize}
                 documentId={activeDocId}
               />
             </div>
@@ -324,7 +328,7 @@ export default function Workspace() {
             <UploadCloud size={64} className="mb-4 text-slate-300" />
             <h2 className="text-xl font-medium text-slate-600">No Document Selected</h2>
             <p className="mt-2 text-sm max-w-sm text-center">Select a document from the sidebar to start your analysis.</p>
-            <button 
+            <button
               onClick={() => setShowUploadModal(true)}
               className="mt-6 px-6 py-2 bg-blue-600 text-white rounded-lg shadow-lg hover:bg-blue-700 transition-all font-medium"
             >
@@ -336,27 +340,27 @@ export default function Workspace() {
 
       <AnimatePresence>
         {showUploadModal && (
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           >
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
               className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full relative"
             >
               {!isUploading && (
-                <button 
+                <button
                   onClick={() => setShowUploadModal(false)}
                   className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
                 >
                   <X size={20} />
                 </button>
               )}
-              
+
               <div className="text-center">
                 <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
                   {isUploading ? (
@@ -374,15 +378,15 @@ export default function Workspace() {
 
                 {!isUploading && (
                   <>
-                    <input 
-                      type="file" 
-                      accept=".pdf,.txt" 
-                      className="hidden" 
+                    <input
+                      type="file"
+                      accept=".pdf,.txt"
+                      className="hidden"
                       ref={fileInputRef}
                       onChange={handleFileUpload}
                       disabled={isUploading}
                     />
-                    <button 
+                    <button
                       onClick={handleUploadClick}
                       className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-xl transition shadow-sm"
                     >
