@@ -75,11 +75,11 @@ router.post('/', async (req, res) => {
           let waitSeconds = attempt * 3;
           // Strategy: Switch model on 2nd and 3rd attempt to bypass specific model overloads
           if (attempt === 2) {
-            console.log(`[Summarize] 🔄 Falling back to gemini-1.5-pro model due to persistent overload...`);
-            model = getChatModel("", "gemini-1.5-pro");
+            console.log(`[Summarize] 🔄 Falling back to gemini-flash-latest model due to persistent overload...`);
+            model = getChatModel("", "gemini-flash-latest");
           } else if (attempt === 3) {
-            console.log(`[Summarize] 🔄 Falling back to gemini-1.5-flash model due to persistent overload...`);
-            model = getChatModel("", "gemini-1.5-flash");
+            console.log(`[Summarize] 🔄 Falling back to gemini-2.5-flash-lite model due to persistent overload...`);
+            model = getChatModel("", "gemini-2.5-flash-lite");
           }
 
           console.log(`[Summarize] Gemini 503/429 Error. Retrying in ${waitSeconds} seconds...`);
