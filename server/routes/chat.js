@@ -107,8 +107,8 @@ router.post('/', async (req, res) => {
 
     const fallbackModels = [
       "gemini-2.5-flash",
-      "gemini-1.5-flash",
-      "gemini-1.5-pro",
+      "gemini-1.5-flash-latest",
+      "gemini-1.5-pro-latest",
       "gemini-pro"
     ];
 
