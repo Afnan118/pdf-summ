@@ -105,7 +105,12 @@ router.post('/', async (req, res) => {
     4. NEVER say "The document doesn't say", "I cannot find this in the context", or apologize. Just answer the question directly.
     5. Never use the words "PDF", "Context", "Document", or "Info" in your reply. Act like you just know the answer.`;
 
-    const currentModel = getChatModel(systemPrompt + "\n\n" + (contextText ? `Info:\n${contextText}` : ""));
+    const fallbackModels = [
+      "gemini-2.5-flash",
+      "gemini-1.5-flash",
+      "gemini-1.5-pro",
+      "gemini-pro"
+    ];
 
     let formattedHistory = (history || []).map(msg => ({
       role: msg.role === 'ai' ? 'model' : 'user',
@@ -128,23 +133,22 @@ router.post('/', async (req, res) => {
 
     console.log(`🤖 [Chat] History count: ${safeHistory.length} items.`);
 
-    const chat = currentModel.startChat({
-      history: safeHistory,
-      generationConfig: { maxOutputTokens: 1500, temperature: 0.4 },
-    });
-
-    // Handle the retry loop for the stream manually
+    // Handle the retry loop with instantaneous model fallback
     let streamAttempt = 0;
-    const maxStreamRetries = 6;
+    const maxStreamRetries = fallbackModels.length;
     let streamSuccess = false;
 
     while (streamAttempt < maxStreamRetries && !streamSuccess) {
       try {
-        if (streamAttempt > 0) {
-          const waitTime = streamAttempt * 12000;
-          console.warn(`[Gemini API] ⏳ Stream retry wait: ${waitTime}ms...`);
-          await new Promise(r => setTimeout(r, waitTime));
-        }
+        const modelName = fallbackModels[streamAttempt];
+        console.log(`[Chat] Attempt ${streamAttempt + 1}: Using model ${modelName}`);
+
+        const currentModel = getChatModel(systemPrompt + "\n\n" + (contextText ? `Info:\n${contextText}` : ""), modelName);
+
+        const chat = currentModel.startChat({
+          history: safeHistory,
+          generationConfig: { maxOutputTokens: 1500, temperature: 0.4 },
+        });
 
         const result = await chat.sendMessageStream(message);
 
@@ -156,6 +160,7 @@ router.post('/', async (req, res) => {
         streamSuccess = true;
       } catch (err) {
         if (err.message && (err.message.includes('429') || err.message.includes('503') || err.message.includes('Quota'))) {
+          console.warn(`[Gemini API] Quota hit on ${fallbackModels[streamAttempt]}, falling back instantly to next model...`);
           streamAttempt++;
           if (streamAttempt >= maxStreamRetries) throw err;
         } else {
